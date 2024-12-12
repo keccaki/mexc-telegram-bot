@@ -1,19 +1,21 @@
 {
   "name": "mexc-sdk",
   "version": "1.0.0",
-  "description": "mexc sdk",
-  "main": "src/index.js",
+  "description": "MEXC SDK integrated with Telegram bot",
+  "main": "src/index.js", 
   "types": "src/index.d.ts",
   "scripts": {
     "build": "jsii",
     "build:watch": "jsii --watch",
-    "package": "mv ./test ../ && rm -rf ./dist && jsii-pacmak -vvv && mv ../test ./"
+    "package": "mv ./test ../ && rm -rf ./dist && jsii-pacmak -vvv && mv ../test ./",
+    "start": "node src/index.js", 
+    "dev": "nodemon src/index.js" 
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mxcdevelop/mexc-api-sdk.git"
+    "url": "https://github.com/keccaki/mexc-api-sdk.git"
   },
-  "keywords": [],
+  "keywords": ["mexc", "sdk", "telegram", "bot", "trading"],
   "author": {
     "name": "MEXC",
     "email": "suggest@mexc.com"
@@ -21,7 +23,11 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^16.11.10",
-    "sync-request": "6.1.0"
+    "sync-request": "6.1.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "body-parser": "^1.20.1",
+    "node-telegram-bot-api": "^0.61.0"
   },
   "bundledDependencies": [
     "sync-request",
