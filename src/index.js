@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const TelegramBot = require('node-telegram-bot-api');
-const { Spot } = require('../dist/modules/spot'); // Adjust the path as needed for MEXC SDK
+const { Spot } = require('../dist/modules/spot'); // Adjust the path if needed
+const schedule = require('node-schedule'); // For scheduling trades
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -58,9 +59,10 @@ Available Commands:
 /orderbook <symbol> - View order book for a trading pair
 /buy <symbol> <quantity> <price> - Place a limit buy order
 /sell <symbol> <quantity> <price> - Place a limit sell order
+/schedulesell <symbol> <price> <quantity> <time> - Schedule a sell order
 /autotrade <symbol> <buyPrice> <sellPrice> <amount> - Start auto-trading
 /stopautotrade - Stop auto-trading
-`;
+  `;
   bot.sendMessage(msg.chat.id, helpMessage);
 });
 
@@ -136,6 +138,33 @@ bot.onText(/\/sell (.+) (.+) (.+)/, async (msg, match) => {
   }
 });
 
+// Schedule sell order
+bot.onText(/\/schedulesell (.+) (.+) (.+) (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const symbol = match[1].toUpperCase();
+  const sellPrice = parseFloat(match[2]);
+  const quantity = parseFloat(match[3]);
+  const date = new Date(match[4]);
+
+  if (date > new Date()) {
+    bot.sendMessage(chatId, `Sell trade scheduled:\nSymbol: ${symbol}\nSell Price: ${sellPrice}\nQuantity: ${quantity}\nTime: ${date}`);
+    schedule.scheduleJob(date, async () => {
+      try {
+        const sellOrder = await client.newOrder(symbol, 'SELL', 'LIMIT', {
+          quantity,
+          price: sellPrice,
+          timeInForce: 'GTC',
+        });
+        bot.sendMessage(chatId, `Sell order placed:\nOrder ID: ${sellOrder.orderId}\nSymbol: ${symbol}\nQuantity: ${quantity}\nPrice: ${sellPrice}`);
+      } catch (error) {
+        bot.sendMessage(chatId, `Error placing scheduled sell order: ${error.response?.data || error.message}`);
+      }
+    });
+  } else {
+    bot.sendMessage(chatId, 'Error: Scheduled time must be in the future.');
+  }
+});
+
 // Auto-trade functionality
 let autoTradeActive = false;
 
@@ -146,7 +175,7 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
   const sellPrice = parseFloat(match[3]);
   const amount = parseFloat(match[4]);
 
-  bot.sendMessage(chatId, `Starting auto-trade for ${symbol}.`);
+  bot.sendMessage(chatId, `Starting auto-trade for ${symbol}. Buy at: ${buyPrice}, Sell at: ${sellPrice}, Amount: ${amount} USDT.`);
   autoTradeActive = true;
 
   while (autoTradeActive) {
@@ -155,7 +184,7 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
       const usdtBalance = accountInfo.balances.find(b => b.asset === 'USDT');
 
       if (!usdtBalance || parseFloat(usdtBalance.free) < amount) {
-        bot.sendMessage(chatId, `Insufficient USDT balance to auto-trade.`);
+        bot.sendMessage(chatId, `Insufficient USDT balance. Stopping auto-trade.`);
         autoTradeActive = false;
         return;
       }
