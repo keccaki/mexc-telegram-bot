@@ -176,7 +176,7 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
           buyOrderFilled = true;
           bot.sendMessage(chatId, `Buy order filled. Placing sell order.`);
         }
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 200000));
       }
 
       const sellOrder = await client.newOrder(symbol, 'SELL', 'LIMIT', {
