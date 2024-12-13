@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const TelegramBot = require('node-telegram-bot-api');
-const { Spot } = require('../dist/modules/spot'); // Adjust path to your MEXC SDK
+const { Spot } = require('../dist/modules/spot'); // Adjust the path as needed for MEXC SDK
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -60,7 +60,7 @@ Available Commands:
 /sell <symbol> <quantity> <price> - Place a limit sell order
 /autotrade <symbol> <buyPrice> <sellPrice> <amount> - Start auto-trading
 /stopautotrade - Stop auto-trading
-  `;
+`;
   bot.sendMessage(msg.chat.id, helpMessage);
 });
 
@@ -144,53 +144,39 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
   const symbol = match[1].toUpperCase();
   const buyPrice = parseFloat(match[2]);
   const sellPrice = parseFloat(match[3]);
-  const amount = parseFloat(match[4]); // Total USDT to allocate for the trade
+  const amount = parseFloat(match[4]);
 
-  console.log(`Starting auto-trade for ${symbol}. Buy at: ${buyPrice}, Sell at: ${sellPrice}, Amount: ${amount} USDT.`);
-  bot.sendMessage(chatId, `Starting auto-trade for ${symbol}.\nBuy at: ${buyPrice}, Sell at: ${sellPrice}, Amount: ${amount} USDT.`);
+  bot.sendMessage(chatId, `Starting auto-trade for ${symbol}.`);
   autoTradeActive = true;
 
   while (autoTradeActive) {
     try {
-      console.log('Fetching account information...');
       const accountInfo = await client.accountInfo();
-      console.log(`Account Info: ${JSON.stringify(accountInfo)}`);
-
       const usdtBalance = accountInfo.balances.find(b => b.asset === 'USDT');
-      console.log(`USDT Balance: ${usdtBalance ? usdtBalance.free : 0}`);
 
       if (!usdtBalance || parseFloat(usdtBalance.free) < amount) {
-        console.log(`Insufficient USDT balance: Available ${usdtBalance ? usdtBalance.free : 0}, Required ${amount}`);
-        bot.sendMessage(chatId, `Insufficient USDT balance to place buy order for ${symbol} at ${buyPrice} with ${amount} USDT. Stopping auto-trade.`);
+        bot.sendMessage(chatId, `Insufficient USDT balance to auto-trade.`);
         autoTradeActive = false;
         return;
       }
 
       const quantity = (amount / buyPrice).toFixed(6);
-      console.log(`Calculated quantity to buy: ${quantity} ${symbol.split('USDT')[0]}`);
 
       const buyOrder = await client.newOrder(symbol, 'BUY', 'LIMIT', {
         quantity,
         price: buyPrice,
         timeInForce: 'GTC',
       });
-      console.log(`Buy order placed: ${JSON.stringify(buyOrder)}`);
-      bot.sendMessage(chatId, `Buy order placed: ${buyOrder.orderId}. Waiting for order to fill...`);
+      bot.sendMessage(chatId, `Buy order placed. Waiting for fill.`);
 
       let buyOrderFilled = false;
       while (!buyOrderFilled && autoTradeActive) {
-        console.log(`Checking status of buy order: ${buyOrder.orderId}`);
         const orderStatus = await client.queryOrder(symbol, { orderId: buyOrder.orderId });
-        console.log(`Buy Order Status: ${JSON.stringify(orderStatus)}`);
-
         if (orderStatus.status === 'FILLED') {
           buyOrderFilled = true;
-          bot.sendMessage(chatId, `Buy order filled for ${symbol} at ${buyPrice}. Placing sell order at ${sellPrice}.`);
-          console.log('Buy order filled. Proceeding to sell...');
-        } else {
-          console.log('Buy order not filled yet. Retrying in 5 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before checking again
+          bot.sendMessage(chatId, `Buy order filled. Placing sell order.`);
         }
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
       const sellOrder = await client.newOrder(symbol, 'SELL', 'LIMIT', {
@@ -198,27 +184,19 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
         price: sellPrice,
         timeInForce: 'GTC',
       });
-      console.log(`Sell order placed: ${JSON.stringify(sellOrder)}`);
-      bot.sendMessage(chatId, `Sell order placed: ${sellOrder.orderId}. Waiting for order to fill...`);
+      bot.sendMessage(chatId, `Sell order placed. Waiting for fill.`);
 
       let sellOrderFilled = false;
       while (!sellOrderFilled && autoTradeActive) {
-        console.log(`Checking status of sell order: ${sellOrder.orderId}`);
         const orderStatus = await client.queryOrder(symbol, { orderId: sellOrder.orderId });
-        console.log(`Sell Order Status: ${JSON.stringify(orderStatus)}`);
-
         if (orderStatus.status === 'FILLED') {
           sellOrderFilled = true;
-          bot.sendMessage(chatId, `Sell order filled for ${symbol} at ${sellPrice}. Starting next cycle...`);
-          console.log('Sell order filled. Starting next cycle...');
-        } else {
-          console.log('Sell order not filled yet. Retrying in 5 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before checking again
+          bot.sendMessage(chatId, `Sell order filled. Auto-trade cycle complete.`);
         }
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     } catch (error) {
-      console.error(`Error in auto-trade loop: ${error.response?.data || error.message}`);
-      bot.sendMessage(chatId, `Error in auto-trade loop: ${error.response?.data || error.message}`);
+      bot.sendMessage(chatId, `Error in auto-trade: ${error.response?.data || error.message}`);
       autoTradeActive = false;
     }
   }
@@ -226,6 +204,5 @@ bot.onText(/\/autotrade (.+) (.+) (.+) (.+)/, async (msg, match) => {
 
 bot.onText(/\/stopautotrade/, (msg) => {
   autoTradeActive = false;
-  console.log('Auto-trade stopped by user.');
   bot.sendMessage(msg.chat.id, "Auto-trade stopped.");
 });
